@@ -1,6 +1,9 @@
-﻿namespace Minimal_API_Swagger_JWT.Interfaces
+﻿using Minimal_API_Swagger_JWT.Models;
+
+namespace Minimal_API_Swagger_JWT.Interfaces
 {
-    public class IUserService
+    public interface IUserService
     {
+        public User Get(UserLogin userLogin);
     }
 }

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 using Minimal_API_Swagger_JWT.Interfaces;
 using Minimal_API_Swagger_JWT.Models;
 using Minimal_API_Swagger_JWT.Services;
@@ -10,7 +11,32 @@ using System.Security.Claims;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+    {
+        Scheme = "Bearer",
+        BearerFormat = "JWT",
+        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+        Name = "Authorization",
+        Description = "Bearer Authentication with JWT Token",
+        Type = Microsoft.OpenApi.Models.SecuritySchemeType.Http
+    });
+    options.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Id = "Bearer",
+                    Type = ReferenceType.SecurityScheme
+                }
+            },
+            new List<string>()
+        }
+    });
+});
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
 {
     options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters()
@@ -20,7 +46,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
         ValidateLifetime = true,
         ValidateIssuerSigningKey = true,
         ValidIssuer = builder.Configuration["Jwt:Issuer"],
-        ValidAudience = builder.Configuration["JwtAudience"],
+        ValidAudience = builder.Configuration["Jwt:Audience"],
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
     };
 });
@@ -79,7 +105,9 @@ app.MapPost("/create",
     return Results.Ok(result);
 });
 
-app.MapGet("/get", (int id, IMovieService service) => 
+app.MapGet("/get",
+[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = "Standard, Administrator")]
+(int id, IMovieService service) => 
 {
     var result = service.Get(id);
     if (result is null) Results.NotFound("Not found a movie with id:" + id);
@@ -92,14 +120,18 @@ app.MapGet("/list", (IMovieService service) =>
     return Results.Ok(result);
 });
 
-app.MapPut("/update", (Movie newMovie, IMovieService service) =>
+app.MapPut("/update",
+[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = "Administrator")]
+(Movie newMovie, IMovieService service) =>
 {
     var result = service.Update(newMovie);
     if (result is null) Results.NotFound("Not found a movie with id:" + newMovie.Id);
     return Results.Ok(result);
 });
 
-app.MapDelete("/delete", (int id, IMovieService service) =>
+app.MapDelete("/delete",
+[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = "Administrator")]
+(int id, IMovieService service) =>
 {
     var result = service.Delete(id);
     if (!result) Results.BadRequest("Not found a movie with id:" + id);
